@@ -13,7 +13,6 @@
  * Swapping engines later: see src/server/db/README.md.
  */
 import { drizzle } from "drizzle-orm/libsql";
-import { createClient } from "@libsql/client";
 import * as schema from "./schema";
 
 const dialect = process.env.DATABASE_DIALECT ?? "sqlite";
@@ -33,6 +32,16 @@ if (dialect !== "sqlite") {
       `Follow src/server/db/README.md to enable ${dialect}.`
   );
 }
+
+// Two libsql client flavors, chosen at runtime:
+// - remote URLs -> @libsql/client/web: pure fetch, no WebSocket/native deps,
+//   required on serverless (Vercel bundling misses @libsql/isomorphic-ws);
+// - file: URLs (local dev) -> the full Node client with file support.
+// Dynamic imports keep the unused flavor from ever loading.
+const isRemote = /^(https?|libsql|wss?):\/\//.test(url);
+const { createClient } = isRemote
+  ? await import("@libsql/client/web")
+  : await import("@libsql/client");
 
 const client = createClient({
   url,

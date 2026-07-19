@@ -78,6 +78,13 @@ export default function TreeCanvas() {
       setLoading(false);
       return;
     }
+    // A failed server function can resolve to undefined instead of throwing —
+    // treat anything malformed as an error, never crash the page.
+    if (!layout || !Array.isArray(layout.nodes) || !Array.isArray(layout.edges)) {
+      setError("Could not load the tree (server error). Please try again shortly.");
+      setLoading(false);
+      return;
+    }
     treeNodes = layout.nodes;
     setNodeCount(treeNodes.length);
     setLoading(false);
