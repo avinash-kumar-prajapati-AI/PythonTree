@@ -79,8 +79,8 @@ drizzle/             generated SQL migrations (checked in)
 scripts/             migrate.ts, stress-tree.ts
 ```
 
-Deployment guide: [DEPLOY.md](DEPLOY.md). Database details:
-[src/server/db/README.md](src/server/db/README.md).
+Database details: [src/server/db/README.md](src/server/db/README.md).
+(Deployment notes live in a local `DEPLOY.md`, kept out of the repo.)
 
 ## Future scope (planned, not built)
 
