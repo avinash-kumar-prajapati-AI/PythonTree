@@ -16,7 +16,14 @@ import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "./schema";
 
 const dialect = process.env.DATABASE_DIALECT ?? "sqlite";
-const rawUrl = process.env.DATABASE_URL ?? "file:./data/pythontree.db";
+// DATABASE_URL/DATABASE_AUTH_TOKEN are ours; the DATABASE_TURSO_* pair is
+// what Vercel's Turso marketplace integration injects. Ours win if both exist.
+const rawUrl =
+  process.env.DATABASE_URL ??
+  process.env.DATABASE_TURSO_DATABASE_URL ??
+  "file:./data/pythontree.db";
+const authToken =
+  process.env.DATABASE_AUTH_TOKEN || process.env.DATABASE_TURSO_AUTH_TOKEN || undefined;
 // libsql:// means Hrana-over-WebSocket, which can hang in serverless
 // runtimes (Vercel). Turso serves the same API over plain HTTPS, so always
 // prefer that transport; file: and https: URLs pass through untouched.
@@ -46,7 +53,7 @@ const { createClient } = isRemote
 const client = createClient({
   url,
   // Only needed for remote (Turso) URLs; undefined is fine for file: DBs.
-  authToken: process.env.DATABASE_AUTH_TOKEN || undefined
+  authToken
 });
 
 export const db = drizzle(client, { schema });
