@@ -15,7 +15,13 @@ import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
 import * as schema from "./schema";
 
-const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+// The Vercel Neon integration may store its variables under a custom prefix
+// (this project uses "DB_"), so accept those spellings too.
+const url =
+  process.env.DATABASE_URL ??
+  process.env.POSTGRES_URL ??
+  process.env.DB_DATABASE_URL ??
+  process.env.DB_POSTGRES_URL;
 
 if (!url || !/^postgres(ql)?:\/\//.test(url)) {
   throw new Error(
