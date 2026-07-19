@@ -2,59 +2,30 @@
  * Database client, kept behind one module so the rest of the app never knows
  * which engine is underneath.
  *
- * Configured via environment:
- *   DATABASE_DIALECT    = sqlite (default) | postgres | mysql
- *   DATABASE_URL        = file:./data/pythontree.db (default)
- *                         libsql://<db>.turso.io  (hosted sqlite/Turso)
- *                         postgres://user:pass@host/db
- *                         mysql://user:pass@host/db
- *   DATABASE_AUTH_TOKEN = auth token, required for Turso URLs only
+ * Engine: PostgreSQL on Neon, accessed with @neondatabase/serverless —
+ * a fetch-based driver with no sockets or native modules, safe in every
+ * runtime (Vercel serverless, bun scripts, local dev).
  *
- * Swapping engines later: see src/server/db/README.md.
+ * Configuration:
+ *   DATABASE_URL = postgres://... (Neon connection string; the Vercel Neon
+ *                  integration injects it automatically. POSTGRES_URL is
+ *                  accepted as a fallback.)
  */
-import { drizzle } from "drizzle-orm/libsql";
+import { drizzle } from "drizzle-orm/neon-http";
+import { neon } from "@neondatabase/serverless";
 import * as schema from "./schema";
 
-const dialect = process.env.DATABASE_DIALECT ?? "sqlite";
-// DATABASE_URL/DATABASE_AUTH_TOKEN are ours; the DATABASE_TURSO_* pair is
-// what Vercel's Turso marketplace integration injects. Ours win if both exist.
-const rawUrl =
-  process.env.DATABASE_URL ??
-  process.env.DATABASE_TURSO_DATABASE_URL ??
-  "file:./data/pythontree.db";
-const authToken =
-  process.env.DATABASE_AUTH_TOKEN || process.env.DATABASE_TURSO_AUTH_TOKEN || undefined;
-// libsql:// means Hrana-over-WebSocket, which can hang in serverless
-// runtimes (Vercel). Turso serves the same API over plain HTTPS, so always
-// prefer that transport; file: and https: URLs pass through untouched.
-const url = rawUrl.replace(/^libsql:\/\//, "https://");
+const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
 
-if (dialect !== "sqlite") {
-  // Deliberate hard stop instead of a silent fallback. When the project is
-  // ready to move, install the driver and follow the README:
-  //   postgres: bun add postgres  -> drizzle-orm/postgres-js
-  //   mysql:    bun add mysql2    -> drizzle-orm/mysql2
+if (!url || !/^postgres(ql)?:\/\//.test(url)) {
   throw new Error(
-    `DATABASE_DIALECT="${dialect}" requested but only sqlite is wired up yet. ` +
-      `Follow src/server/db/README.md to enable ${dialect}.`
+    "DATABASE_URL must be a postgres:// connection string (Neon). " +
+      "Locally: put it in .env. On Vercel: the Neon integration provides it — " +
+      "remove any old DATABASE_URL/DATABASE_AUTH_TOKEN project variables that shadow it."
   );
 }
 
-// Two libsql client flavors, chosen at runtime:
-// - remote URLs -> @libsql/client/web: pure fetch, no WebSocket/native deps,
-//   required on serverless (Vercel bundling misses @libsql/isomorphic-ws);
-// - file: URLs (local dev) -> the full Node client with file support.
-// Dynamic imports keep the unused flavor from ever loading.
-const isRemote = /^(https?|libsql|wss?):\/\//.test(url);
-const { createClient } = isRemote
-  ? await import("@libsql/client/web")
-  : await import("@libsql/client");
+const sqlClient = neon(url);
 
-const client = createClient({
-  url,
-  // Only needed for remote (Turso) URLs; undefined is fine for file: DBs.
-  authToken
-});
-
-export const db = drizzle(client, { schema });
+export const db = drizzle(sqlClient, { schema });
 export { schema };

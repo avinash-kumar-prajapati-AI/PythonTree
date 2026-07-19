@@ -1,52 +1,46 @@
-# Deploying PythonTree (free: Vercel + Turso)
+# Deploying PythonTree (free: Vercel + Neon)
 
-Production runs on Vercel (SSR serverless) with the database on Turso
-(hosted libsql — same `@libsql/client` the app already uses).
+Production runs on Vercel (SSR serverless) with the database on Neon
+(serverless Postgres), connected through Vercel's Neon marketplace
+integration. The database driver is `@neondatabase/serverless` — pure
+fetch, no sockets, no native modules, so serverless bundling can't break it.
 
-## One-time setup (already done)
+(History: the project first tried Turso/libsql; Vercel's bundler kept
+omitting the client's WebSocket dependency. Postgres was always the
+documented swap path, so we took it.)
 
-- Turso database created; migrations + seeds applied to it:
-  ```powershell
-  $env:DATABASE_URL="libsql://<your-db>.turso.io"
-  $env:DATABASE_AUTH_TOKEN="<token>"
-  bun run db:migrate; bun run db:seed; bun run db:seed:ecosystem
-  ```
-- `app.config.ts` preset set to `"vercel"`.
-- Code pushed to https://github.com/avinash-kumar-prajapati-AI/PythonTree
+## Setup
 
-## Creating the Vercel project
-
-1. Go to https://vercel.com/new, sign in with GitHub, import the
-   `PythonTree` repository.
-2. Framework preset: it should detect SolidStart; build command `bun run build`
-   (or leave default `npm run build` — both work), output is handled by the
-   vercel preset automatically.
-3. Add the environment variables (Project → Settings → Environment Variables):
-
-   | Name | Value |
-   |---|---|
-   | `DATABASE_URL` | `libsql://<your-db>.turso.io` |
-   | `DATABASE_AUTH_TOKEN` | your Turso token |
-   | `ADMIN_PASSWORD` | a STRONG password — this guards /admin on the public internet |
-   | `SESSION_SECRET` | 32+ random characters |
-
-4. Deploy. Every future `git push` to `main` redeploys automatically.
+1. **Neon database**: Vercel dashboard → Storage → Neon → create the free
+   database and connect it to the PythonTree project. This injects
+   `DATABASE_URL` (and `POSTGRES_URL` etc.) into the project automatically.
+2. **Remove stale variables**: delete any manually-added `DATABASE_URL` /
+   `DATABASE_AUTH_TOKEN` from Project → Settings → Environment Variables —
+   leftovers from the Turso era would shadow the integration's values.
+   Keep `ADMIN_PASSWORD` (strong!) and `SESSION_SECRET` (32+ random chars).
+3. **Migrate + seed** from your machine (one time): copy the connection
+   string from the integration panel into `.env` as `DATABASE_URL`, then:
+   ```sh
+   bun run db:migrate
+   bun run db:seed
+   bun run db:seed:ecosystem
+   ```
+4. **Deploy**: `git push` — every push to `main` redeploys automatically.
 
 ## After deploying
 
-- Open the URL → the tree should show all published nodes.
+- Open the site → the tree should show all published nodes.
 - Log in at `/admin` with `ADMIN_PASSWORD` and publish a test edit.
-- Local dev is unchanged: `.env` keeps `DATABASE_URL=file:./data/pythontree.db`.
+- Local dev (`bun run dev`) uses the same Neon database via `.env`.
 
 ## Notes & gotchas
 
 - **Never** put real credentials in `.env.example` (committed) — only in
-  `.env` (gitignored) and Vercel's env settings.
-- If the Turso token ever leaks or you lose it: `turso db tokens create` a
-  new one and update it in Vercel; old tokens can be revoked with
-  `turso db tokens invalidate`.
-- `bun run db:migrate` (scripts/migrate.ts) applies migrations to whatever
-  `DATABASE_URL` points at — local file by default, Turso when the env vars
-  are set. Run it against Turso after adding any new migration.
+  `.env` (gitignored) and the Vercel integration/env settings.
+- The no-delete policy lives in `drizzle/0001_no_delete_guard.sql` as a
+  Postgres trigger; migrations run via `scripts/migrate.ts` (drizzle-orm's
+  programmatic migrator over the Neon HTTP driver).
 - The tree-layout cache is per serverless instance with a 60s TTL; a fresh
   instance rebuilds it in well under 100 ms, so cold starts are fine.
+- Neon free tier suspends compute after inactivity; the first query after
+  a quiet period takes ~1s extra while it wakes. Normal and harmless.

@@ -13,3 +13,5 @@ data/*.db-shm
 /.claude
 
  
+.vercel
+.env*

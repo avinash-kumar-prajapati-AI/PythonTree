@@ -13,7 +13,7 @@
     "db:seed:ecosystem": "bun run src/server/db/seed-ecosystem.ts"
   },
   "dependencies": {
-    "@libsql/client": "^0.15.0",
+    "@neondatabase/serverless": "^1.1.0",
     "@solidjs/meta": "^0.29.4",
     "@solidjs/router": "^0.15.3",
     "@solidjs/start": "^1.1.0",

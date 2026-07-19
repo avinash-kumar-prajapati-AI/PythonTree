@@ -1,22 +1,25 @@
 /**
- * Database schema (Drizzle ORM, SQLite dialect).
+ * Database schema (Drizzle ORM, PostgreSQL dialect — hosted on Neon).
  *
- * DIALECT SWAP (SQLite -> Postgres/MySQL):
- * The schema is written with `drizzle-orm/sqlite-core`. To move to Postgres or
- * MySQL, switch the imports to `pg-core`/`mysql-core` (column builders have
- * the same names/shape), set DATABASE_DIALECT + DATABASE_URL in .env, and run
- * `bun run db:generate && bun run db:migrate`. See src/server/db/README.md
- * for the full, safe migration procedure.
+ * History: started on SQLite; swapped to Postgres/Neon on 2026-07-19 because
+ * serverless hosting needs a network database anyway. Thanks to Drizzle the
+ * swap only touched this file, client.ts and the generated migrations —
+ * the repo layer and app code are dialect-agnostic.
+ *
+ * Date columns are ISO strings (text) on purpose: they render directly in
+ * the UI and survive any future engine swap without Date/timezone surprises.
  */
-import { sqliteTable, text, integer, primaryKey, uniqueIndex, index } from "drizzle-orm/sqlite-core";
+import { pgTable, text, integer, boolean, jsonb, primaryKey, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { sql, relations } from "drizzle-orm";
+
+const isoNow = sql`to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`;
 
 /** Registered users. Only admins can publish for now; OAuth columns are ready
  *  for the future GitHub/Google/LinkedIn/Twitter signup scope. */
-export const users = sqliteTable(
+export const users = pgTable(
   "users",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
     username: text("username").notNull(),
     displayName: text("display_name"),
     email: text("email"),
@@ -27,17 +30,17 @@ export const users = sqliteTable(
     providerId: text("provider_id"),
     avatarUrl: text("avatar_url"),
     /** When a user disables their profile, their nodes become hidden — never deleted. */
-    disabled: integer("disabled", { mode: "boolean" }).notNull().default(false),
-    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`)
+    disabled: boolean("disabled").notNull().default(false),
+    createdAt: text("created_at").notNull().default(isoNow)
   },
   t => [uniqueIndex("users_username_idx").on(t.username)]
 );
 
 /** A node in the knowledge tree: python itself, a package, a framework, ... */
-export const nodes = sqliteTable(
+export const nodes = pgTable(
   "nodes",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
     slug: text("slug").notNull(),
     name: text("name").notNull(),
     kind: text("kind", {
@@ -56,8 +59,8 @@ export const nodes = sqliteTable(
       .notNull()
       .default("opensource"),
     license: text("license"),
-    /** Extra important timestamps as JSON: [{ "date": "1995-01-01", "label": "1.0 release" }] */
-    milestones: text("milestones", { mode: "json" }).$type<{ date: string; label: string }[]>(),
+    /** Extra important timestamps: [{ "date": "1995-01-01", "label": "1.0 release" }] */
+    milestones: jsonb("milestones").$type<{ date: string; label: string }[]>(),
 
     // --- long-form content (markdown) ---
     installGuide: text("install_guide").notNull().default(""),
@@ -73,11 +76,11 @@ export const nodes = sqliteTable(
      *              only edited or hidden (visible = false).
      */
     status: text("status", { enum: ["draft", "preview", "published"] }).notNull().default("draft"),
-    visible: integer("visible", { mode: "boolean" }).notNull().default(true),
+    visible: boolean("visible").notNull().default(true),
 
     createdBy: integer("created_by").references(() => users.id),
-    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+    createdAt: text("created_at").notNull().default(isoNow),
+    updatedAt: text("updated_at").notNull().default(isoNow),
     publishedAt: text("published_at")
   },
   t => [uniqueIndex("nodes_slug_idx").on(t.slug), index("nodes_status_idx").on(t.status)]
@@ -88,7 +91,7 @@ export const nodes = sqliteTable(
  * building on both `requests` and `asyncio`), so the tree is really a DAG.
  * `parent` is the thing being inherited from / built upon.
  */
-export const nodeEdges = sqliteTable(
+export const nodeEdges = pgTable(
   "node_edges",
   {
     parentId: integer("parent_id")
@@ -102,10 +105,10 @@ export const nodeEdges = sqliteTable(
 );
 
 /** External links attached to a node: GitHub, Discord, forum, PyPI, custom. */
-export const nodeLinks = sqliteTable(
+export const nodeLinks = pgTable(
   "node_links",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
     nodeId: integer("node_id")
       .notNull()
       .references(() => nodes.id),

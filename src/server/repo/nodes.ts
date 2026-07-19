@@ -7,7 +7,7 @@
  * never demoted back to draft/preview.
  */
 import { and, eq, inArray } from "drizzle-orm";
-import { alias } from "drizzle-orm/sqlite-core";
+import { alias } from "drizzle-orm/pg-core";
 import { db, schema } from "../db/client";
 import { invalidateTreeLayout } from "./treeLayout";
 

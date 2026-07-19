@@ -13,7 +13,7 @@
  * nodes array (not DB ids), ~100 bytes/node on the wire before gzip.
  */
 import { and, eq } from "drizzle-orm";
-import { alias } from "drizzle-orm/sqlite-core";
+import { alias } from "drizzle-orm/pg-core";
 import { db, schema } from "../db/client";
 
 const { nodes, nodeEdges } = schema;
