@@ -1,0 +1,14 @@
+node_modules/
+.vinxi/
+.output/
+.vercel/
+dist/
+app.config.timestamp_*.js
+*.local
+.env
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+/.claude
+

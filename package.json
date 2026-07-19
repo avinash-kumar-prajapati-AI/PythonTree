@@ -1,0 +1,35 @@
+{
+  "name": "pythontree",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vinxi dev",
+    "build": "vinxi build",
+    "start": "vinxi start",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun run scripts/migrate.ts",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "bun run src/server/db/seed.ts",
+    "db:seed:ecosystem": "bun run src/server/db/seed-ecosystem.ts"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.15.0",
+    "@solidjs/meta": "^0.29.4",
+    "@solidjs/router": "^0.15.3",
+    "@solidjs/start": "^1.1.0",
+    "drizzle-orm": "^0.44.0",
+    "marked": "^18.0.6",
+    "solid-js": "^1.9.5",
+    "three": "^0.185.1",
+    "vinxi": "^0.5.3"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "@types/three": "^0.185.1",
+    "drizzle-kit": "^0.31.0",
+    "typescript": "^5.8.0"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
+  }
+}
