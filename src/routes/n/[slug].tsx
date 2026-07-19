@@ -26,7 +26,7 @@ export default function NodePage() {
         {n => (
           <>
             <Title>{n().name} — PythonTree</Title>
-            <NodeDetail node={n() as any} />
+            <NodeDetail node={n()} />
           </>
         )}
       </Show>

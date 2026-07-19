@@ -23,7 +23,6 @@ documented swap path, so we took it.)
    ```sh
    bun run db:migrate
    bun run db:seed
-   bun run db:seed:ecosystem
    ```
 4. **Deploy**: `git push` — every push to `main` redeploys automatically.
 

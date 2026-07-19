@@ -5,7 +5,6 @@
  */
 import { query, action, redirect } from "@solidjs/router";
 import {
-  getPublishedTree,
   getNodeBySlug,
   listAllNodes,
   createNode,
@@ -18,11 +17,6 @@ import { getTreeLayout } from "./repo/treeLayout";
 import { login, logout, isAdmin, requireAdmin } from "./session";
 
 // ---------- public reads ----------
-
-export const treeQuery = query(async () => {
-  "use server";
-  return getPublishedTree();
-}, "tree");
 
 /** Compact, server-cached layout for the WebGL tree — scales to 10k+ nodes. */
 export const treeLayoutQuery = query(async () => {

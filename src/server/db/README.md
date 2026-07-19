@@ -1,61 +1,50 @@
 # Database
 
-SQLite today (via `@libsql/client`, plain `file:` database), designed so the
-engine can be swapped for Postgres or MySQL later without touching app code.
+PostgreSQL hosted on **Neon** (free tier), accessed with
+`@neondatabase/serverless` — a fetch-based driver that works identically in
+Vercel serverless functions, bun scripts and local dev. Connected via
+`DATABASE_URL` (locally from `.env`; in production injected by the Vercel
+Neon integration, possibly under a `DB_` prefix — `client.ts` accepts both).
 
 ## Layout
 
-- `schema.ts` — all tables (Drizzle ORM). The single source of truth.
-- `client.ts` — the only place that knows which engine is used. Everything
-  else imports `db` from here.
+- `schema.ts` — all tables (Drizzle ORM, pg-core). The single source of truth.
+- `client.ts` — the only place that knows which engine/driver is used.
+  Everything else imports `db` from here.
+- `seed.ts` + `seed-ecosystem.ts` — demo content, idempotent per slug.
 - `../repo/*` — data access functions. Routes never run raw queries.
-- `../../..../drizzle/` — generated SQL migrations (checked into git).
+- `/drizzle` (repo root) — generated SQL migrations, checked into git.
 
 ## Everyday commands
 
 ```sh
 bun run db:generate   # diff schema.ts -> new migration file in ./drizzle
-bun run db:migrate    # apply pending migrations to the database
-bun run db:seed       # insert the demo python tree (idempotent)
+bun run db:migrate    # apply pending migrations (scripts/migrate.ts)
+bun run db:seed       # plant/refresh the demo tree (skips existing slugs)
 bun run db:studio     # browse data in drizzle-kit studio
 ```
+
+After changing `schema.ts`: `db:generate`, review the SQL, then `db:migrate`.
 
 ## Node deletion policy (enforced here, not just in the UI)
 
 - There is **no delete function** in the repo layer and no delete endpoint.
-- A published node can only be edited or set `visible = false` (hidden).
-- Migration `0001_no_delete_guard.sql` installs a database trigger that
-  aborts any `DELETE` on a published node — even a stray manual query or a
-  future bug cannot remove one.
-- When a user disables their profile, their nodes are hidden in bulk, never
-  deleted.
+- A published node can only be edited or set `visible = false` (hidden);
+  its slug is frozen so shared links never break.
+- Migration `0001_no_delete_guard.sql` installs a plpgsql trigger that
+  raises an exception on any `DELETE` of a published node — even a stray
+  manual query or a future bug cannot remove one.
+- When a user disables their profile, their nodes are hidden in bulk
+  (`hideNodesByUser`), never deleted.
 
-## Swapping to Postgres or MySQL later (safe procedure)
+## History / swapping engines again
 
-1. **Freeze writes** (stop the app or put it in read-only).
-2. Install the driver:
-   - Postgres: `bun add postgres`
-   - MySQL: `bun add mysql2`
-3. In `schema.ts`, change the import from `drizzle-orm/sqlite-core` to
-   `drizzle-orm/pg-core` (or `mysql-core`) and adjust the few
-   SQLite-specific bits: `integer(..., { mode: "boolean" })` becomes
-   `boolean(...)`, `text(..., { mode: "json" })` becomes `jsonb(...)`,
-   default `datetime('now')` becomes `now()`.
-4. In `client.ts`, add a branch for the new dialect
-   (`drizzle-orm/postgres-js` or `drizzle-orm/mysql2`).
-5. Set the environment:
-   ```
-   DATABASE_DIALECT=postgres
-   DATABASE_URL=postgres://user:pass@host:5432/pythontree
-   ```
-6. Generate fresh baseline migrations for the new dialect:
-   `bunx drizzle-kit generate` (with the new env active) and apply them to
-   the empty target database with `bunx drizzle-kit migrate`.
-7. **Copy the data.** Row-copy is enough at this size: read every table from
-   the SQLite file and insert into the new database (order: users, nodes,
-   node_links, node_edges to satisfy foreign keys). Keep the old `.db` file
-   as the rollback path.
-8. Re-create the no-delete trigger for the new engine (see
-   `drizzle/0001_no_delete_guard.sql` for the SQLite version; Postgres uses
-   `CREATE TRIGGER ... EXECUTE FUNCTION`, MySQL `SIGNAL SQLSTATE '45000'`).
-9. Run the app against the new database, verify, then unfreeze writes.
+The project started on SQLite (with Turso for hosting) and swapped to
+Neon Postgres on 2026-07-19 — serverless bundling kept breaking the libsql
+client, and Postgres was the designed escape hatch. The swap touched only
+`schema.ts` (sqlite-core -> pg-core column builders), `client.ts` (driver),
+and regenerated migrations; the repo layer and app code were untouched.
+The same recipe applies to any future move (e.g. to MySQL or self-hosted
+Postgres): change the column-builder imports, swap the driver in
+`client.ts`, regenerate migrations, row-copy the data, re-create the
+no-delete trigger in the target dialect.

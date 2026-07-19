@@ -6,28 +6,11 @@ import {
   setStatusAction,
   setVisibilityAction
 } from "~/server/api";
-import type { NodeInput } from "~/server/repo/nodes";
+import type { NodeInput, NodeWithRelations } from "~/server/repo/nodes";
 import { Button } from "./Button";
 
-type Existing = {
-  id: number;
-  slug: string;
-  name: string;
-  kind: string;
-  summary: string;
-  launchedAt: string | null;
-  launchedBy: string | null;
-  ownership: string;
-  license: string | null;
-  milestones: { date: string; label: string }[] | null;
-  installGuide: string;
-  tutorial: string;
-  commonFunctions: string;
-  status: string;
-  visible: boolean;
-  links: { kind: string; label: string; url: string }[];
-  parents: { slug: string }[];
-};
+const LINK_KINDS = ["github", "discord", "forum", "pypi", "docs", "website", "custom"] as const;
+type LinkKind = (typeof LINK_KINDS)[number];
 
 /**
  * Create/edit form implementing the lifecycle:
@@ -35,7 +18,7 @@ type Existing = {
  * Published nodes lose the publish/draft controls and gain only
  * Save changes + Hide/Unhide. Deletion does not exist.
  */
-export const NodeForm: Component<{ node?: Existing }> = props => {
+export const NodeForm: Component<{ node?: NodeWithRelations }> = props => {
   const navigate = useNavigate();
   const createNode = useAction(createNodeAction);
   const updateNode = useAction(updateNodeAction);
@@ -95,8 +78,10 @@ export const NodeForm: Component<{ node?: Existing }> = props => {
       .filter(Boolean)
       .map(l => {
         const [kind, label, ...rest] = l.split("|");
+        const k = kind.trim() as LinkKind;
         return {
-          kind: kind.trim() as any,
+          // unknown kinds degrade to "custom" instead of storing junk
+          kind: LINK_KINDS.includes(k) ? k : "custom",
           label: (label ?? "").trim(),
           url: rest.join("|").trim()
         };
@@ -196,7 +181,10 @@ export const NodeForm: Component<{ node?: Existing }> = props => {
         </label>
         <label>
           Kind
-          <select value={kind()} onChange={e => setKind(e.currentTarget.value)}>
+          <select
+            value={kind()}
+            onChange={e => setKind(e.currentTarget.value as NonNullable<NodeInput["kind"]>)}
+          >
             <option value="language">language</option>
             <option value="package">package</option>
             <option value="framework">framework</option>
@@ -223,7 +211,10 @@ export const NodeForm: Component<{ node?: Existing }> = props => {
         </label>
         <label>
           Ownership
-          <select value={ownership()} onChange={e => setOwnership(e.currentTarget.value)}>
+          <select
+            value={ownership()}
+            onChange={e => setOwnership(e.currentTarget.value as NonNullable<NodeInput["ownership"]>)}
+          >
             <option value="opensource">opensource</option>
             <option value="company">company</option>
             <option value="individual">individual</option>

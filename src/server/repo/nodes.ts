@@ -7,7 +7,6 @@
  * never demoted back to draft/preview.
  */
 import { and, eq, inArray } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
 import { db, schema } from "../db/client";
 import { invalidateTreeLayout } from "./treeLayout";
 
@@ -29,31 +28,6 @@ export type NodeInput = {
   parentSlugs?: string[];
   links?: { kind?: typeof nodeLinks.$inferInsert.kind; label: string; url: string }[];
 };
-
-/** All published, visible nodes plus their edges — the public tree. */
-export async function getPublishedTree() {
-  const visibleNodes = await db.query.nodes.findMany({
-    where: and(eq(nodes.status, "published"), eq(nodes.visible, true)),
-    columns: {
-      id: true,
-      slug: true,
-      name: true,
-      kind: true,
-      summary: true,
-      launchedAt: true
-    }
-  });
-  // Join, not `IN (…ids…)` — giant IN lists get very slow past a few
-  // thousand nodes (see treeLayout.ts for the same fix).
-  const p = alias(nodes, "p");
-  const c = alias(nodes, "c");
-  const edges = await db
-    .select({ parentId: nodeEdges.parentId, childId: nodeEdges.childId })
-    .from(nodeEdges)
-    .innerJoin(p, and(eq(p.id, nodeEdges.parentId), eq(p.status, "published"), eq(p.visible, true)))
-    .innerJoin(c, and(eq(c.id, nodeEdges.childId), eq(c.status, "published"), eq(c.visible, true)));
-  return { nodes: visibleNodes, edges };
-}
 
 /** Full node detail. Preview mode also returns draft/preview/hidden nodes. */
 export async function getNodeBySlug(slug: string, opts: { includeUnpublished?: boolean } = {}) {
@@ -79,6 +53,9 @@ export async function getNodeBySlug(slug: string, opts: { includeUnpublished?: b
   return { ...node, parents: parentRows, children: childRows };
 }
 
+/** What node pages and the editor receive: the node plus links/parents/children. */
+export type NodeWithRelations = NonNullable<Awaited<ReturnType<typeof getNodeBySlug>>>;
+
 export async function listAllNodes() {
   return db.query.nodes.findMany({
     columns: { id: true, slug: true, name: true, status: true, visible: true, updatedAt: true },
@@ -88,6 +65,13 @@ export async function listAllNodes() {
 
 /** Create a new node. Always starts as a draft regardless of input. */
 export async function createNode(input: NodeInput, createdBy?: number) {
+  const taken = await db.query.nodes.findFirst({
+    where: eq(nodes.slug, input.slug),
+    columns: { id: true }
+  });
+  if (taken) {
+    throw new Error(`The slug "${input.slug}" is already taken — pick another one.`);
+  }
   const [row] = await db
     .insert(nodes)
     .values({

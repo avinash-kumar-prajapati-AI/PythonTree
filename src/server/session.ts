@@ -7,6 +7,7 @@ import { useSession, getCookie, getEvent } from "vinxi/http";
 
 type SessionData = { role?: "admin" };
 
+const SESSION_COOKIE = "pythontree";
 const SESSION_SECRET =
   process.env.SESSION_SECRET ?? "dev-only-secret-change-me-in-production-1234";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "admin";
@@ -18,7 +19,7 @@ if (!process.env.ADMIN_PASSWORD) {
 }
 
 function session() {
-  return useSession<SessionData>({ password: SESSION_SECRET, name: "pythontree" });
+  return useSession<SessionData>({ password: SESSION_SECRET, name: SESSION_COOKIE });
 }
 
 export async function login(password: string): Promise<boolean> {
@@ -37,7 +38,7 @@ export async function isAdmin(): Promise<boolean> {
   // Reads must never CREATE a session: during streaming SSR the response
   // headers are already sent, and h3 would throw trying to set the new
   // session cookie. Only `login` (a POST action) creates the session.
-  if (!getCookie(getEvent(), "pythontree")) return false;
+  if (!getCookie(getEvent(), SESSION_COOKIE)) return false;
   try {
     const s = await session();
     return s.data.role === "admin";

@@ -2,6 +2,7 @@ import { For, Show, type Component } from "solid-js";
 import { A } from "@solidjs/router";
 import { Markdown } from "./Markdown";
 import { ShareButton } from "./ShareButton";
+import type { NodeWithRelations } from "~/server/repo/nodes";
 
 const LINK_ICONS: Record<string, string> = {
   github: "🐙",
@@ -13,28 +14,7 @@ const LINK_ICONS: Record<string, string> = {
   custom: "🔗"
 };
 
-type Detail = {
-  slug: string;
-  name: string;
-  kind: string;
-  summary: string;
-  launchedAt: string | null;
-  launchedBy: string | null;
-  ownership: string;
-  license: string | null;
-  milestones: { date: string; label: string }[] | null;
-  installGuide: string;
-  tutorial: string;
-  commonFunctions: string;
-  status: string;
-  visible: boolean;
-  publishedAt: string | null;
-  links: { id: number; kind: string; label: string; url: string }[];
-  parents: { slug: string; name: string }[];
-  children: { slug: string; name: string }[];
-};
-
-export const NodeDetail: Component<{ node: Detail; isPreview?: boolean }> = props => {
+export const NodeDetail: Component<{ node: NodeWithRelations; isPreview?: boolean }> = props => {
   const n = () => props.node;
   return (
     <article class="node-page">
