@@ -17,7 +17,11 @@ import { createClient } from "@libsql/client";
 import * as schema from "./schema";
 
 const dialect = process.env.DATABASE_DIALECT ?? "sqlite";
-const url = process.env.DATABASE_URL ?? "file:./data/pythontree.db";
+const rawUrl = process.env.DATABASE_URL ?? "file:./data/pythontree.db";
+// libsql:// means Hrana-over-WebSocket, which can hang in serverless
+// runtimes (Vercel). Turso serves the same API over plain HTTPS, so always
+// prefer that transport; file: and https: URLs pass through untouched.
+const url = rawUrl.replace(/^libsql:\/\//, "https://");
 
 if (dialect !== "sqlite") {
   // Deliberate hard stop instead of a silent fallback. When the project is
